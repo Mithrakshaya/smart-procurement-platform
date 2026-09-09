@@ -1,17 +1,25 @@
 import sys
 import os
 
-# Get the path of the Grain folder
-grain_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "grain")
+# Get the base path of farmer-access
+base_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..")
 )
 
-# Add Grain folder to Python path
+# Get paths of required folders
+grain_path = os.path.join(base_path, "grain")
+status_path = os.path.join(base_path, "status")
+
+# Add folders to Python path
 sys.path.append(grain_path)
+sys.path.append(status_path)
 
 # Import Grain workflow functions
 from sell_grain import create_sell_request
 from buy_grain import create_buy_request
+
+# Import Status workflow function
+from status_service import check_request_status
 
 
 def route_action(intent, farmer_details=None):
@@ -60,9 +68,20 @@ def route_action(intent, farmer_details=None):
 
     # Handle CHECK_STATUS request
     elif intent == "CHECK_STATUS":
+
+        if not farmer_details:
+            return {
+                "action": "CHECK_STATUS",
+                "response": "Please provide a request ID to check the status"
+            }
+
+        request_id = farmer_details.get("request_id")
+
+        result = check_request_status(request_id)
+
         return {
             "action": "CHECK_STATUS",
-            "response": "Checking your request status"
+            "response": result
         }
 
     # Handle unknown requests
@@ -96,3 +115,11 @@ if __name__ == "__main__":
 
     buy_result = route_action("BUY_GRAIN", buyer_details)
     print("BUY_GRAIN →", buy_result)
+
+    # Test CHECK_STATUS
+    status_details = {
+        "request_id": "REQ002"
+    }
+
+    status_result = route_action("CHECK_STATUS", status_details)
+    print("CHECK_STATUS →", status_result)
