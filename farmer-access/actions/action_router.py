@@ -9,8 +9,9 @@ grain_path = os.path.abspath(
 # Add Grain folder to Python path
 sys.path.append(grain_path)
 
-# Import Sell Grain function
+# Import Grain workflow functions
 from sell_grain import create_sell_request
+from buy_grain import create_buy_request
 
 
 def route_action(intent, farmer_details=None):
@@ -18,14 +19,12 @@ def route_action(intent, farmer_details=None):
     # Handle SELL_GRAIN request
     if intent == "SELL_GRAIN":
 
-        # Check whether farmer details are available
         if not farmer_details:
             return {
                 "action": "SELL_GRAIN",
                 "response": "Please provide farmer details to create a selling request"
             }
 
-        # Create the actual selling request
         result = create_sell_request(
             farmer_name=farmer_details.get("farmer_name"),
             grain_type=farmer_details.get("grain_type"),
@@ -38,18 +37,35 @@ def route_action(intent, farmer_details=None):
             "response": result
         }
 
+    # Handle BUY_GRAIN request
     elif intent == "BUY_GRAIN":
+
+        if not farmer_details:
+            return {
+                "action": "BUY_GRAIN",
+                "response": "Please provide buyer details to create a buying request"
+            }
+
+        result = create_buy_request(
+            buyer_name=farmer_details.get("buyer_name"),
+            grain_type=farmer_details.get("grain_type"),
+            quantity=farmer_details.get("quantity", 0),
+            location=farmer_details.get("location")
+        )
+
         return {
             "action": "BUY_GRAIN",
-            "response": "Starting the grain buying process"
+            "response": result
         }
 
+    # Handle CHECK_STATUS request
     elif intent == "CHECK_STATUS":
         return {
             "action": "CHECK_STATUS",
             "response": "Checking your request status"
         }
 
+    # Handle unknown requests
     else:
         return {
             "action": "UNKNOWN",
@@ -59,13 +75,24 @@ def route_action(intent, farmer_details=None):
 
 if __name__ == "__main__":
 
-    farmer_details = {
+    # Test SELL_GRAIN
+    seller_details = {
         "farmer_name": "Ramesh",
         "grain_type": "Rice",
         "quantity": 500,
         "location": "Bhimavaram"
     }
 
-    result = route_action("SELL_GRAIN", farmer_details)
+    sell_result = route_action("SELL_GRAIN", seller_details)
+    print("SELL_GRAIN →", sell_result)
 
-    print(result)
+    # Test BUY_GRAIN
+    buyer_details = {
+        "buyer_name": "Suresh",
+        "grain_type": "Wheat",
+        "quantity": 300,
+        "location": "Bhimavaram"
+    }
+
+    buy_result = route_action("BUY_GRAIN", buyer_details)
+    print("BUY_GRAIN →", buy_result)
