@@ -1,30 +1,46 @@
 import sys
 import os
 
-# Get the base path of farmer-access
+
+# ==========================================
+# GET REQUIRED FOLDER PATHS
+# ==========================================
+
 base_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
 )
 
-# Get paths of required folders
 grain_path = os.path.join(base_path, "grain")
 status_path = os.path.join(base_path, "status")
 
-# Add folders to Python path
+
+# ==========================================
+# ADD PATHS TO PYTHON PATH
+# ==========================================
+
 sys.path.append(grain_path)
 sys.path.append(status_path)
 
-# Import Grain workflow functions
+
+# ==========================================
+# IMPORT REQUIRED MODULES
+# ==========================================
+
 from sell_grain import create_sell_request
 from buy_grain import create_buy_request
-
-# Import Status workflow function
 from status_service import check_request_status
 
 
+# ==========================================
+# ROUTE FARMER ACTION
+# ==========================================
+
 def route_action(intent, farmer_details=None):
 
+    # ------------------------------------------
     # Handle SELL_GRAIN request
+    # ------------------------------------------
+
     if intent == "SELL_GRAIN":
 
         if not farmer_details:
@@ -45,7 +61,10 @@ def route_action(intent, farmer_details=None):
             "response": result
         }
 
+    # ------------------------------------------
     # Handle BUY_GRAIN request
+    # ------------------------------------------
+
     elif intent == "BUY_GRAIN":
 
         if not farmer_details:
@@ -66,13 +85,16 @@ def route_action(intent, farmer_details=None):
             "response": result
         }
 
+    # ------------------------------------------
     # Handle CHECK_STATUS request
+    # ------------------------------------------
+
     elif intent == "CHECK_STATUS":
 
-        if not farmer_details:
+        if not farmer_details or not farmer_details.get("request_id"):
             return {
                 "action": "CHECK_STATUS",
-                "response": "Please provide a request ID to check the status"
+                "response": "Please provide a valid request ID"
             }
 
         request_id = farmer_details.get("request_id")
@@ -84,7 +106,10 @@ def route_action(intent, farmer_details=None):
             "response": result
         }
 
-    # Handle unknown requests
+    # ------------------------------------------
+    # Handle UNKNOWN request
+    # ------------------------------------------
+
     else:
         return {
             "action": "UNKNOWN",
@@ -92,9 +117,16 @@ def route_action(intent, farmer_details=None):
         }
 
 
+# ==========================================
+# TEST ACTION ROUTER
+# ==========================================
+
 if __name__ == "__main__":
 
+    # ------------------------------------------
     # Test SELL_GRAIN
+    # ------------------------------------------
+
     seller_details = {
         "farmer_name": "Ramesh",
         "grain_type": "Rice",
@@ -102,24 +134,47 @@ if __name__ == "__main__":
         "location": "Bhimavaram"
     }
 
-    sell_result = route_action("SELL_GRAIN", seller_details)
-    print("SELL_GRAIN →", sell_result)
+    sell_result = route_action(
+        "SELL_GRAIN",
+        seller_details
+    )
 
+    print("SELL_GRAIN")
+    print(sell_result)
+    print()
+
+    # ------------------------------------------
     # Test BUY_GRAIN
+    # ------------------------------------------
+
     buyer_details = {
         "buyer_name": "Suresh",
         "grain_type": "Wheat",
         "quantity": 300,
-        "location": "Bhimavaram"
+        "location": "Hyderabad"
     }
 
-    buy_result = route_action("BUY_GRAIN", buyer_details)
-    print("BUY_GRAIN →", buy_result)
+    buy_result = route_action(
+        "BUY_GRAIN",
+        buyer_details
+    )
 
+    print("BUY_GRAIN")
+    print(buy_result)
+    print()
+
+    # ------------------------------------------
     # Test CHECK_STATUS
+    # ------------------------------------------
+
     status_details = {
         "request_id": "REQ002"
     }
 
-    status_result = route_action("CHECK_STATUS", status_details)
-    print("CHECK_STATUS →", status_result)
+    status_result = route_action(
+        "CHECK_STATUS",
+        status_details
+    )
+
+    print("CHECK_STATUS")
+    print(status_result)

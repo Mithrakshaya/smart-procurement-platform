@@ -44,44 +44,26 @@ def process_farmer_voice(message, farmer_details=None):
             "message": "No voice message received"
         }
 
-    # ------------------------------------------
-    # STEP 1: Detect the farmer's intent
-    # ------------------------------------------
-
+    # Step 1: Detect intent
     intent = detect_intent(message)
 
-    # ------------------------------------------
-    # STEP 2: Extract entities automatically
-    # ------------------------------------------
-
+    # Step 2: Extract entities automatically
     extracted_entities = extract_entities(message)
 
-    # ------------------------------------------
-    # STEP 3: Create final details dictionary
-    # ------------------------------------------
-
+    # Step 3: Start with automatically extracted entities
     final_details = extracted_entities.copy()
 
-    # ------------------------------------------
-    # STEP 4: Add manually provided details
-    # ------------------------------------------
-
+    # Step 4: Add manually provided details if available
     if farmer_details:
         final_details.update(farmer_details)
 
-    # ------------------------------------------
-    # STEP 5: Route the request
-    # ------------------------------------------
-
+    # Step 5: Send intent and details to Action Router
     action_result = route_action(
         intent,
         final_details
     )
 
-    # ------------------------------------------
-    # STEP 6: Return complete response
-    # ------------------------------------------
-
+    # Step 6: Return complete result
     return {
         "success": True,
         "original_message": message,
@@ -94,14 +76,14 @@ def process_farmer_voice(message, farmer_details=None):
 
 
 # ==========================================
-# TEST THE COMPLETE FARMER WORKFLOW
+# TEST COMPLETE FARMER WORKFLOW
 # ==========================================
 
 if __name__ == "__main__":
 
-    # =========================================
+    # ------------------------------------------
     # TEST 1: SELL GRAIN
-    # =========================================
+    # ------------------------------------------
 
     sell_result = process_farmer_voice(
         "I want to sell 500 kg of rice from Bhimavaram",
@@ -115,9 +97,9 @@ if __name__ == "__main__":
     print()
 
 
-    # =========================================
+    # ------------------------------------------
     # TEST 2: BUY GRAIN
-    # =========================================
+    # ------------------------------------------
 
     buy_result = process_farmer_voice(
         "I want to buy 300 kg of wheat in Hyderabad",
@@ -131,15 +113,12 @@ if __name__ == "__main__":
     print()
 
 
-    # =========================================
-    # TEST 3: CHECK REQUEST STATUS
-    # =========================================
+    # ------------------------------------------
+    # TEST 3: CHECK STATUS AUTOMATICALLY
+    # ------------------------------------------
 
     status_result = process_farmer_voice(
-        "I want to track my request",
-        {
-            "request_id": "REQ002"
-        }
+        "What is the status of request REQ002?"
     )
 
     print("CHECK_STATUS")
