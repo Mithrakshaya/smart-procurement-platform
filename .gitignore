@@ -1,12 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+
+# Virtual environments
+venv/
 .venv/
 .venv-1/
-__pycache__/
-*.pyc
+env/
+
+# Jupyter
 .ipynb_checkpoints/
+
+# Environment variables
+.env
+.env.*
+
+# VS Code
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# SQLite database
+*.db
+
+# AI/ML generated data
 grainflow_historical_data.csv
 ai/data/grainflow_features.csv
 ai/data/grainflow_preprocessed.csv
 ai/evaluation/model_comparison_results.csv
+
+# AI/ML model files
 *.joblib
 *.keras
-.env
