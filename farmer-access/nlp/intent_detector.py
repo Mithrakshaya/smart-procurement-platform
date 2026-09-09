@@ -15,9 +15,17 @@ def detect_intent(message):
 
 
 if __name__ == "__main__":
-    test_message = "I want to buy wheat"
 
-    result = detect_intent(test_message)
+    test_messages = [
+        "I want to sell my rice",
+        "I want to buy wheat",
+        "I want to track my order",
+        "Hello, I need some help"
+    ]
 
-    print("Message:", test_message)
-    print("Detected Intent:", result)
+    for message in test_messages:
+        result = detect_intent(message)
+
+        print("Message:", message)
+        print("Detected Intent:", result)
+        print("-" * 40)
