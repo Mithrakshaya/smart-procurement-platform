@@ -18,7 +18,7 @@ from intent_detector import detect_intent
 from action_router import route_action
 
 
-def process_farmer_voice(message):
+def process_farmer_voice(message, farmer_details=None):
 
     if not message:
         return {
@@ -29,8 +29,8 @@ def process_farmer_voice(message):
     # Step 1: Detect farmer intent
     intent = detect_intent(message)
 
-    # Step 2: Route the detected intent to the correct action
-    action_result = route_action(intent)
+    # Step 2: Send intent and farmer details to Action Router
+    action_result = route_action(intent, farmer_details)
 
     return {
         "success": True,
@@ -43,13 +43,18 @@ def process_farmer_voice(message):
 
 if __name__ == "__main__":
 
-    test_messages = [
-        "I want to sell my rice",
-        "I want to buy wheat",
-        "I want to track my order",
-        "Hello, I need help"
-    ]
+    # Farmer details for testing the Sell Grain workflow
+    farmer_details = {
+        "farmer_name": "Ramesh",
+        "grain_type": "Rice",
+        "quantity": 500,
+        "location": "Bhimavaram"
+    }
 
-    for message in test_messages:
-        result = process_farmer_voice(message)
-        print(result)
+    # Test SELL_GRAIN with actual farmer details
+    result = process_farmer_voice(
+        "I want to sell my rice",
+        farmer_details
+    )
+
+    print(result)
