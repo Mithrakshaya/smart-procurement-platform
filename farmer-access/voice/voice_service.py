@@ -2,23 +2,34 @@ import sys
 import os
 
 
-# Get the main farmer-access folder path
 base_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..")
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
 )
 
-nlp_path = os.path.join(base_path, "nlp")
-actions_path = os.path.join(base_path, "actions")
-conversation_path = os.path.join(base_path, "conversation")
+nlp_path = os.path.join(
+    base_path,
+    "nlp"
+)
+
+actions_path = os.path.join(
+    base_path,
+    "actions"
+)
+
+conversation_path = os.path.join(
+    base_path,
+    "conversation"
+)
 
 
-# Add folders to Python path
 sys.path.append(nlp_path)
 sys.path.append(actions_path)
 sys.path.append(conversation_path)
 
 
-# Import required modules
 from intent_detector import detect_intent
 from entity_extractor import extract_entities
 from missing_info_detector import find_missing_information
@@ -32,178 +43,181 @@ from conversation_manager import (
 )
 
 
-def extract_name(message, intent):
+def process_farmer_voice(message, additional_details=None):
 
-    words = message.strip().split()
-
-    # If the user provides only one word,
-    # treat it as a name during an active conversation
-    if len(words) == 1 and words[0].isalpha():
-
-        if intent == "SELL_GRAIN":
-            return {
-                "farmer_name": words[0].capitalize()
-            }
-
-        elif intent == "BUY_GRAIN":
-            return {
-                "buyer_name": words[0].capitalize()
-            }
-
-    return {}
-
-
-def process_farmer_voice(message):
-
-    # Handle empty messages
     if not message:
         return {
             "success": False,
             "message": "No voice message received"
         }
 
-    # Get existing conversation
+    message_details = extract_entities(message)
+
+    detected_intent = detect_intent(message)
+
     conversation = get_conversation()
 
-    # ----------------------------------------
-    # CASE 1: NEW CONVERSATION
-    # ----------------------------------------
+    # Check whether the user started a new request
+    if conversation:
+
+        current_intent = conversation.get("intent")
+
+        if (
+            detected_intent != "UNKNOWN"
+            and detected_intent != current_intent
+        ):
+
+            clear_conversation()
+            conversation = {}
+
+    # Start a new conversation
     if not conversation:
 
-        intent = detect_intent(message)
-
-        extracted_entities = extract_entities(message)
-
-        details = extracted_entities.copy()
-
-        missing_fields = find_missing_information(
-            intent,
-            details
-        )
-
-        # Save incomplete request
-        if missing_fields:
-
-            start_conversation(
-                intent,
-                details
-            )
+        if detected_intent == "UNKNOWN":
 
             return {
                 "success": False,
                 "original_message": message,
-                "detected_intent": intent,
-                "details": details,
-                "missing_information": missing_fields,
-                "message": "Please provide: " +
-                           ", ".join(missing_fields)
+                "detected_intent": "UNKNOWN",
+                "message": "Sorry, I could not understand your request"
             }
 
-        # Process complete request
-        action_result = route_action(
+        intent = detected_intent
+
+        start_conversation(
             intent,
-            details
+            message_details
         )
 
-        return {
-            "success": True,
-            "original_message": message,
-            "detected_intent": intent,
-            "action": action_result["action"],
-            "response": action_result["response"]
-        }
-
-    # ----------------------------------------
-    # CASE 2: CONTINUE CONVERSATION
-    # ----------------------------------------
     else:
 
-        # Get saved intent and details
-        intent = conversation["intent"]
+        intent = conversation.get("intent")
 
-        saved_details = conversation["details"].copy()
+    # Add extra details such as farmer name or buyer name
+    if additional_details:
 
-        # Extract information from the new message
-        extracted_entities = extract_entities(message)
-
-        # Extract possible name
-        name_details = extract_name(
-            message,
-            intent
+        message_details.update(
+            additional_details
         )
 
-        # Merge extracted details
-        # ONLY replace values when the new value is not None
-        for key, value in extracted_entities.items():
+    # Update the conversation without deleting old information
+    update_conversation(
+        message_details
+    )
 
-            if value is not None:
-                saved_details[key] = value
+    # Get the latest conversation data
+    conversation = get_conversation()
 
-        # Merge name details
-        for key, value in name_details.items():
+    intent = conversation.get("intent")
 
-            if value is not None:
-                saved_details[key] = value
+    details = conversation.get("details")
 
-        # Update conversation with merged details
-        update_conversation(saved_details)
+    # Find missing information
+    missing_information = find_missing_information(
+        intent,
+        details
+    )
 
-        # Get the final updated conversation
-        conversation = get_conversation()
-
-        details = conversation["details"]
-
-        # Check missing information
-        missing_fields = find_missing_information(
-            intent,
-            details
-        )
-
-        # If information is still missing
-        if missing_fields:
-
-            return {
-                "success": False,
-                "original_message": message,
-                "detected_intent": intent,
-                "details": details,
-                "missing_information": missing_fields,
-                "message": "Please provide: " +
-                           ", ".join(missing_fields)
-            }
-
-        # All information is available
-        action_result = route_action(
-            intent,
-            details
-        )
-
-        # Clear conversation after successful processing
-        clear_conversation()
+    # Ask for missing information
+    if missing_information:
 
         return {
-            "success": True,
+            "success": False,
             "original_message": message,
             "detected_intent": intent,
             "details": details,
-            "action": action_result["action"],
-            "response": action_result["response"]
+            "missing_information": missing_information,
+            "message": (
+                "Please provide: "
+                + ", ".join(missing_information)
+            )
         }
+
+    # All information is available
+    action_result = route_action(
+        intent,
+        details
+    )
+
+    # Clear conversation after successful completion
+    clear_conversation()
+
+    return {
+        "success": True,
+        "original_message": message,
+        "detected_intent": intent,
+        "details": details,
+        "action": action_result.get("action"),
+        "response": action_result.get("response")
+    }
 
 
 if __name__ == "__main__":
 
-    messages = [
-        "I want to sell rice",
-        "500 kg from Bhimavaram",
-        "Ramesh"
+    print("TEST 1: SELL_GRAIN MULTI-TURN")
+    print()
+
+    sell_messages = [
+        (
+            "I want to sell rice",
+            None
+        ),
+        (
+            "500 kg from Bhimavaram",
+            None
+        ),
+        (
+            "Ramesh",
+            {
+                "farmer_name": "Ramesh"
+            }
+        )
     ]
 
-    for message in messages:
+    for message, additional_details in sell_messages:
 
         print("Farmer:", message)
 
-        result = process_farmer_voice(message)
+        result = process_farmer_voice(
+            message,
+            additional_details
+        )
+
+        print("System:")
+        print(result)
+
+        print("-" * 60)
+
+
+    print()
+    print("TEST 2: BUY_GRAIN MULTI-TURN")
+    print()
+
+    buy_messages = [
+        (
+            "I want to buy wheat",
+            None
+        ),
+        (
+            "300 kg in Hyderabad",
+            None
+        ),
+        (
+            "Suresh",
+            {
+                "buyer_name": "Suresh"
+            }
+        )
+    ]
+
+    for message, additional_details in buy_messages:
+
+        print("Buyer:", message)
+
+        result = process_farmer_voice(
+            message,
+            additional_details
+        )
 
         print("System:")
         print(result)

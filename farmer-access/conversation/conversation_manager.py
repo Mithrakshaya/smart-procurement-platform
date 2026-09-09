@@ -1,38 +1,50 @@
-conversation_state = {}
+conversation_data = {}
 
 
-def start_conversation(intent, details):
+def start_conversation(intent, details=None):
+    global conversation_data
 
-    conversation_state["intent"] = intent
-    conversation_state["details"] = details.copy()
+    if details is None:
+        details = {}
 
-    return conversation_state
+    conversation_data = {
+        "intent": intent,
+        "details": details.copy()
+    }
+
+    return conversation_data
 
 
 def update_conversation(new_details):
+    global conversation_data
 
-    if "details" not in conversation_state:
-        return None
+    if not conversation_data:
+        return {}
 
-    conversation_state["details"].update(
-        new_details
-    )
+    existing_details = conversation_data.get("details", {})
 
-    return conversation_state
+    for key, value in new_details.items():
+        if value is not None:
+            existing_details[key] = value
+
+    conversation_data["details"] = existing_details
+
+    return conversation_data
 
 
 def get_conversation():
-
-    return conversation_state
+    return conversation_data
 
 
 def clear_conversation():
+    global conversation_data
 
-    conversation_state.clear()
+    conversation_data = {}
+
+    return conversation_data
 
 
 if __name__ == "__main__":
-
     print("Starting conversation...")
 
     start_conversation(
@@ -47,9 +59,7 @@ if __name__ == "__main__":
 
     print(get_conversation())
 
-    print()
-
-    print("Adding new information...")
+    print("\nAdding quantity and location...")
 
     update_conversation(
         {
@@ -60,9 +70,17 @@ if __name__ == "__main__":
 
     print(get_conversation())
 
-    print()
+    print("\nAdding farmer name...")
 
-    print("Clearing conversation...")
+    update_conversation(
+        {
+            "farmer_name": "Ramesh"
+        }
+    )
+
+    print(get_conversation())
+
+    print("\nClearing conversation...")
 
     clear_conversation()
 
