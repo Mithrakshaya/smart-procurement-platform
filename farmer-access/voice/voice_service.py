@@ -1,17 +1,16 @@
-def detect_farmer_intent(message):
-    message = message.lower()
+import sys
+import os
 
-    if any(word in message for word in ["sell", "selling", "price"]):
-        return "SELL_GRAIN"
+# Get the path of the NLP folder
+nlp_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "nlp")
+)
 
-    elif any(word in message for word in ["buy", "purchase"]):
-        return "BUY_GRAIN"
+# Add NLP folder to Python path
+sys.path.append(nlp_path)
 
-    elif any(word in message for word in ["status", "order", "request"]):
-        return "CHECK_STATUS"
-
-    else:
-        return "UNKNOWN"
+# Import intent detection function
+from intent_detector import detect_intent
 
 
 def process_farmer_voice(message):
@@ -22,7 +21,8 @@ def process_farmer_voice(message):
             "message": "No voice message received"
         }
 
-    intent = detect_farmer_intent(message)
+    # Detect the farmer's intention
+    intent = detect_intent(message)
 
     return {
         "success": True,
@@ -33,8 +33,15 @@ def process_farmer_voice(message):
 
 
 if __name__ == "__main__":
-    test_message = "I want to sell my rice"
 
-    result = process_farmer_voice(test_message)
+    test_messages = [
+        "I want to sell my rice",
+        "I want to buy wheat",
+        "I want to track my order",
+        "Hello, I need help"
+    ]
 
-    print(result)
+    for message in test_messages:
+        result = process_farmer_voice(message)
+        print(result)
+        
