@@ -1,0 +1,12 @@
+.venv/
+.venv-1/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+grainflow_historical_data.csv
+ai/data/grainflow_features.csv
+ai/data/grainflow_preprocessed.csv
+ai/evaluation/model_comparison_results.csv
+*.joblib
+*.keras
+.env
