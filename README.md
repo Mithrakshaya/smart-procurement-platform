@@ -102,3 +102,26 @@ npm run build
 ## Limitations and future improvements
 
 Request persistence is a local JSON store and is intended for demonstrations, evaluation, and small local deployments rather than concurrent production workloads. Speech recognition availability depends on browser permissions and platform support. Future versions could add authenticated users, a transactional database, real buyer/farmer matching, multilingual speech support, and deployment configuration.
+# GrainFlow AI - Member 3
+
+This module is responsible for AI Prediction and Queue Management.
+
+## Responsibilities
+
+1. Farmer arrival prediction
+2. Queue length prediction
+3. Waiting-time prediction
+4. Procurement-centre congestion prediction
+5. Smart appointment-slot recommendation
+6. Explainable AI
+7. AI prediction APIs
+
+## Technology
+
+- Python
+- Pandas
+- NumPy
+- Scikit-learn
+- TensorFlow/Keras
+- SHAP
+- FastAPI
