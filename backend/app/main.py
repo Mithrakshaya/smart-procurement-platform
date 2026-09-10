@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.modules.dashboard.routes import router as dashboard_router
+from backend.app.modules.dashboard.routes import router as dashboard_router
 
 from backend.app.modules.farmer.router import router as farmer_router
 from backend.app.db.database import Base, engine
