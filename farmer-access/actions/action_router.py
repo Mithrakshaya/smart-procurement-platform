@@ -96,7 +96,10 @@ def handle_sell(details):
 
     return {
         "success": True,
-        "message": "Grain selling request created successfully",
+        "message": (
+            f"Request {request['request_id']} has been created successfully "
+            "with status Request Created."
+        ),
         "request": request
     }
 
@@ -130,7 +133,10 @@ def handle_buy(details):
 
     return {
         "success": True,
-        "message": "Grain buying request created successfully",
+        "message": (
+            f"Request {request['request_id']} has been created successfully "
+            "with status Request Created."
+        ),
         "request": request
     }
 
@@ -160,8 +166,7 @@ def handle_check_status(details):
         return {
             "success": False,
             "message": (
-                f"I could not find request {request_id}. "
-                "Please check the request ID and try again."
+                "Request not found. Please check the Request ID and try again."
             )
         }
 
@@ -169,13 +174,17 @@ def handle_check_status(details):
         "status",
         "REQUEST_CREATED"
     )
+    if status == "REQUEST_CREATED":
+        message = f"Request {request['request_id']} has been created successfully."
+    else:
+        message = (
+            f"Request {request['request_id']} is currently "
+            f"{status.replace('_', ' ').lower()}."
+        )
 
     return {
         "success": True,
-        "message": (
-            f"Request {request['request_id']} "
-            f"is currently {status.replace('_', ' ').lower()}."
-        ),
+        "message": message,
         "request": request
     }
 

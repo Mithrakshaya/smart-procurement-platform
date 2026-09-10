@@ -177,6 +177,13 @@ def update_request_status(request_id, new_status):
     Update the status of an existing request.
     """
 
+    from smart_parser import normalize_status, VALID_STATUSES
+
+    normalized_status = normalize_status(new_status)
+
+    if normalized_status not in VALID_STATUSES:
+        return None
+
     requests = _load_requests()
 
     request_id = request_id.strip().upper()
@@ -185,7 +192,7 @@ def update_request_status(request_id, new_status):
 
         if request.get("request_id", "").upper() == request_id:
 
-            request["status"] = new_status
+            request["status"] = normalized_status
 
             request["updated_at"] = datetime.now().isoformat(
                 timespec="seconds"

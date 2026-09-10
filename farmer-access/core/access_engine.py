@@ -720,11 +720,13 @@ def execute_action(
 
     except Exception as error:
 
+        print(f"Action execution error: {error}")
+
         return {
             "success": False,
             "completed": False,
             "message":
-                f"Unable to process your request: {error}"
+                "Unable to process your request. Please try again.",
         }
 
     response = action_result.get(

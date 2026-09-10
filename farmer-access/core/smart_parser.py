@@ -15,65 +15,101 @@ VALID_STATUSES = {
     "REJECTED",
 }
 
-
 STATUS_ALIASES = {
     "REQUEST CREATED": "REQUEST_CREATED",
-    "CREATED": "REQUEST_CREATED",
-
     "UNDER REVIEW": "UNDER_REVIEW",
-    "REVIEW": "UNDER_REVIEW",
-
+    "IN REVIEW": "UNDER_REVIEW",
     "MATCHED": "MATCHED",
-    "MATCH": "MATCHED",
-
     "NEGOTIATION": "NEGOTIATION",
-    "NEGOTIATE": "NEGOTIATION",
-
     "COMPLETED": "COMPLETED",
-    "COMPLETE": "COMPLETED",
-    "DONE": "COMPLETED",
-
     "CANCELLED": "CANCELLED",
-    "CANCELED": "CANCELLED",
-    "CANCEL": "CANCELLED",
-
     "REJECTED": "REJECTED",
-    "REJECT": "REJECTED",
 }
+
+
+def normalize_status(value):
+    """Normalize free-text status values to canonical codes."""
+
+    if value is None:
+        return None
+
+    text = str(value).strip()
+
+    if not text:
+        return None
+
+    upper = text.upper().replace("-", "_")
+    upper_spaced = text.upper().replace("_", " ").strip()
+
+    if upper in VALID_STATUSES:
+        return upper
+
+    if upper_spaced in STATUS_ALIASES:
+        return STATUS_ALIASES[upper_spaced]
+
+    compact = upper_spaced.replace(" ", "_")
+    if compact in VALID_STATUSES:
+        return compact
+
+    return compact
 
 
 # ============================================================
 # BASIC CLEANING
 # ============================================================
 
-def clean_text(value):
-    if value is None:
+def clean_text(text):
+    if not text:
         return ""
 
-    return str(value).strip()
+    text = str(text).strip()
+    text = re.sub(r"\s+", " ", text)
+
+    return text
 
 
-def normalize_text(value):
-    value = clean_text(value)
-
-    value = re.sub(
-        r"\s+",
-        " ",
-        value
-    )
-
-    return value.lower()
+def normalize_text(text):
+    return clean_text(text).lower()
 
 
 # ============================================================
-# REQUEST ID
+# QUANTITY EXTRACTION
+# ============================================================
+
+def extract_quantity(text):
+    text = clean_text(text)
+
+    patterns = [
+        r"\b(\d+(?:\.\d+)?)\s*(?:kg|kgs|kilogram|kilograms)\b",
+        r"\b(\d+(?:\.\d+)?)\s*(?:ton|tons|tonne|tonnes)\b",
+        r"\b(\d+(?:\.\d+)?)\s*(?:quintal|quintals)\b",
+        r"\bquantity\s*(?:is|of)?\s*(\d+(?:\.\d+)?)\b",
+        r"\bqty\s*(?:is|of)?\s*(\d+(?:\.\d+)?)\b",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                return None
+
+    return None
+
+
+# ============================================================
+# REQUEST ID EXTRACTION
 # ============================================================
 
 def extract_request_id(text):
+    text = clean_text(text)
+
     match = re.search(
         r"\bREQ\d+\b",
         text,
-        flags=re.IGNORECASE
+        re.IGNORECASE
     )
 
     if match:
@@ -83,159 +119,128 @@ def extract_request_id(text):
 
 
 # ============================================================
-# STATUS
+# STATUS EXTRACTION
 # ============================================================
-
-def normalize_status(value):
-    if value is None:
-        return None
-
-    value = clean_text(value)
-
-    normalized = value.upper().replace("-", "_")
-
-    if normalized in VALID_STATUSES:
-        return normalized
-
-    alias_key = value.upper()
-
-    if alias_key in STATUS_ALIASES:
-        return STATUS_ALIASES[alias_key]
-
-    alias_key = alias_key.replace("_", " ")
-
-    if alias_key in STATUS_ALIASES:
-        return STATUS_ALIASES[alias_key]
-
-    return normalized
-
 
 def extract_status(text):
-    normalized = normalize_text(text)
+    text = clean_text(text)
 
-    # --------------------------------------------------------
-    # Explicit status phrases
-    # --------------------------------------------------------
+    # Direct status matching.
+    # Sort by length so longer statuses are checked first.
+    statuses = sorted(
+        VALID_STATUSES,
+        key=len,
+        reverse=True
+    )
 
-    patterns = [
-        r"(?:to|as|status(?:\s+to)?)\s+([a-zA-Z_ -]+)$",
-    ]
+    for status in statuses:
+        pattern = rf"\b{re.escape(status)}\b"
 
-    for pattern in patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            candidate = clean_text(
-                match.group(1)
-            )
-
-            status = normalize_status(candidate)
-
-            if status in VALID_STATUSES:
-                return status
-
-    # --------------------------------------------------------
-    # Search known statuses
-    # --------------------------------------------------------
-
-    for status in VALID_STATUSES:
-
-        readable = status.replace(
-            "_",
-            " "
-        ).lower()
-
-        if readable in normalized:
+        if re.search(pattern, text, re.IGNORECASE):
             return status
 
-        if status.lower() in normalized:
+    # Support natural-language versions
+    # such as "under review".
+    natural_statuses = {
+        "UNDER REVIEW": "UNDER_REVIEW",
+        "REQUEST CREATED": "REQUEST_CREATED",
+        "IN REVIEW": "UNDER_REVIEW",
+    }
+
+    for phrase, status in natural_statuses.items():
+        pattern = rf"\b{re.escape(phrase)}\b"
+
+        if re.search(pattern, text, re.IGNORECASE):
             return status
 
     return None
 
 
 # ============================================================
-# QUANTITY
+# PERSON NAME EXTRACTION
 # ============================================================
 
-def extract_quantity(text):
+def extract_person_name(text):
+    text = clean_text(text)
 
     patterns = [
-
-        r"(\d+(?:\.\d+)?)\s*(?:kg|kgs|kilogram|kilograms)",
-
-        r"(\d+(?:\.\d+)?)\s*(?:ton|tons|tonne|tonnes)",
-
-        r"quantity\s*(?:is|of|:)?\s*(\d+(?:\.\d+)?)",
-
-        r"\b(\d+(?:\.\d+)?)\b"
+        r"\bmy name is\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
+        r"\bname is\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
+        r"\bi am\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
+        r"\bi'm\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
     ]
 
-    for pattern in patterns:
+    stop_words = {
+        "from",
+        "at",
+        "in",
+        "with",
+        "and",
+        "want",
+        "would",
+        "like",
+        "to",
+        "selling",
+        "buying",
+    }
 
+    for pattern in patterns:
         match = re.search(
             pattern,
             text,
-            flags=re.IGNORECASE
+            re.IGNORECASE
         )
 
         if match:
+            name = match.group(1).strip()
 
-            try:
-                return float(
-                    match.group(1)
-                )
+            words = name.split()
 
-            except ValueError:
-                pass
+            while words and words[-1].lower() in stop_words:
+                words.pop()
+
+            if words:
+                return " ".join(words)
 
     return None
 
 
 # ============================================================
-# LOCATION
+# LOCATION EXTRACTION
 # ============================================================
 
 def extract_location(text):
+    text = clean_text(text)
 
     patterns = [
-
-        r"\bfrom\s+(.+?)(?=$|[,.])",
-
-        r"\bat\s+(.+?)(?=$|[,.])",
-
-        r"\bin\s+(.+?)(?=$|[,.])",
-
-        r"location\s*(?:is|:)?\s*(.+)$",
+        r"\bfrom\s+(.+?)(?=\s+(?:my name is|name is|i am|i'm)\b|$)",
+        r"\bat\s+(.+?)(?=\s+(?:my name is|name is|i am|i'm)\b|$)",
+        r"\bin\s+(.+?)(?=\s+(?:my name is|name is|i am|i'm)\b|$)",
+        r"\blocation\s*(?:is|:)?\s*(.+?)(?=\s+(?:my name is|name is|i am|i'm)\b|$)",
     ]
 
     for pattern in patterns:
-
         match = re.search(
             pattern,
             text,
-            flags=re.IGNORECASE
+            re.IGNORECASE
         )
 
         if match:
+            location = match.group(1).strip()
 
-            location = clean_text(
-                match.group(1)
-            )
-
-            # Remove trailing conversational words.
             location = re.sub(
-                r"\s+(?:and|with|for)\s*$",
+                r"[,.!?]+$",
+                "",
+                location
+            ).strip()
+
+            location = re.sub(
+                r"\s+(?:my name is|name is|i am|i'm)\b.*$",
                 "",
                 location,
-                flags=re.IGNORECASE
-            )
+                flags=re.IGNORECASE,
+            ).strip()
 
             if location:
                 return location
@@ -244,132 +249,78 @@ def extract_location(text):
 
 
 # ============================================================
-# PERSON NAME
+# PRODUCT / GRAIN EXTRACTION
 # ============================================================
 
-def extract_person_name(text):
+UNIT_PATTERN = (
+    r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes|"
+    r"quintal|quintals)"
+)
+
+BOUNDARY = r"(?=\s+(?:from|at|in|my name is|name is|i am|i'm)\b|$)"
+
+
+def sanitize_product(product):
+    """Clean and validate extracted product names."""
+
+    if not product:
+        return None
+
+    product = clean_text(product)
+    product = re.sub(r"[,.!?]+$", "", product).strip()
+
+    # Remove accidental trailing name/location fragments.
+    product = re.sub(
+        r"\s+(?:my name is|name is|i am|i'm)\b.*$",
+        "",
+        product,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    # Fix malformed captures such as "s of tomatoes".
+    malformed = re.match(
+        r"^[a-z]\s+of\s+(.+)$",
+        product,
+        re.IGNORECASE,
+    )
+    if malformed:
+        product = malformed.group(1).strip()
+
+    if len(product) < 2:
+        return None
+
+    if re.fullmatch(r"[a-z]\s+of", product, re.IGNORECASE):
+        return None
+
+    return product
+
+
+def extract_product(text):
+    text = clean_text(text)
 
     patterns = [
+        # sell / buy with quantity + unit + of product
+        rf"\b(?:want to\s+)?(?:sell|selling)\s+\d+(?:\.\d+)?\s*"
+        rf"{UNIT_PATTERN}\s+of\s+(.+?){BOUNDARY}",
 
-        r"\bmy name is\s+([A-Za-z][A-Za-z .'-]*)",
+        rf"\b(?:want to\s+)?(?:buy|buying)\s+\d+(?:\.\d+)?\s*"
+        rf"{UNIT_PATTERN}\s+of\s+(.+?){BOUNDARY}",
 
-        r"\bname is\s+([A-Za-z][A-Za-z .'-]*)",
+        # Generic: 50 kg of tomatoes
+        rf"\b\d+(?:\.\d+)?\s*{UNIT_PATTERN}\s+of\s+(.+?){BOUNDARY}",
 
-        r"\bi am\s+([A-Za-z][A-Za-z .'-]*)",
+        # Natural phrasing without the optional "of".
+        rf"\b(?:want to\s+)?(?:sell|selling|buy|buying)\s+\d+(?:\.\d+)?\s*"
+        rf"{UNIT_PATTERN}\s+(.+?){BOUNDARY}",
 
-        r"\bi'm\s+([A-Za-z][A-Za-z .'-]*)",
+        rf"\b\d+(?:\.\d+)?\s*{UNIT_PATTERN}\s+(.+?){BOUNDARY}",
     ]
 
     for pattern in patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
+        match = re.search(pattern, text, re.IGNORECASE)
 
         if match:
-
-            name = clean_text(
-                match.group(1)
-            )
-
-            # Prevent common trailing phrases.
-            name = re.split(
-                r"\s+(?:and|from|in|with|selling|buying)\b",
-                name,
-                maxsplit=1,
-                flags=re.IGNORECASE
-            )[0]
-
-            return name.strip()
-
-    return None
-
-
-# ============================================================
-# PRODUCT
-# ============================================================
-
-def extract_product(text):
-
-    original = clean_text(text)
-
-    # --------------------------------------------------------
-    # SELL
-    # --------------------------------------------------------
-
-    sell_patterns = [
-
-        r"\bi\s+want\s+to\s+sell\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-
-        r"\bwant\s+to\s+sell\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-
-        r"\bsell\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-    ]
-
-    # --------------------------------------------------------
-    # BUY
-    # --------------------------------------------------------
-
-    buy_patterns = [
-
-        r"\bi\s+want\s+to\s+buy\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-
-        r"\bwant\s+to\s+buy\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-
-        r"\bbuy\s+"
-        r"(?:\d+(?:\.\d+)?\s*)?"
-        r"(?:kg|kgs|kilogram|kilograms|ton|tons|tonne|tonnes)?"
-        r"\s*(?:of\s+)?(.+?)(?=\s+from\s+|\s+in\s+|\s+at\s+|$)",
-    ]
-
-    all_patterns = (
-        sell_patterns +
-        buy_patterns
-    )
-
-    for pattern in all_patterns:
-
-        match = re.search(
-            pattern,
-            original,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            product = clean_text(
-                match.group(1)
-            )
-
-            product = re.sub(
-                r"^(?:of|the)\s+",
-                "",
-                product,
-                flags=re.IGNORECASE
-            )
-
-            product = re.sub(
-                r"\s+$",
-                "",
-                product
-            )
+            product = sanitize_product(match.group(1))
 
             if product:
                 return product
@@ -381,354 +332,173 @@ def extract_product(text):
 # INTENT DETECTION
 # ============================================================
 
-def is_update_status_request(text):
-
+def detect_intent(text):
     normalized = normalize_text(text)
 
-    # Explicit update phrases.
-    if re.search(
-        r"\b(update|change|modify|set)\b.*\bstatus\b",
-        normalized
-    ):
-        return True
-
-    # Mark request.
-    if re.search(
-        r"\bmark\s+REQ\d+\s+(?:as|to)\b",
-        text,
-        flags=re.IGNORECASE
-    ):
-        return True
-
-    # REQ001 to COMPLETED
-    if re.search(
-        r"\bREQ\d+\s+(?:to|as)\s+",
-        text,
-        flags=re.IGNORECASE
-    ):
-        status = extract_status(text)
-
-        if status:
-            return True
-
-    return False
-
-
-def is_get_all_requests(text):
-
-    normalized = normalize_text(text)
-
-    patterns = [
-        r"\b(get|show|list|view|display)\b.*\ball\b.*\brequests\b",
-        r"\ball\b.*\brequests\b",
-        r"\bget all requests\b",
-    ]
-
-    return any(
-        re.search(pattern, normalized)
-        for pattern in patterns
-    )
-
-
-def is_check_status_request(text):
-
-    normalized = normalize_text(text)
-
-    if re.search(
-        r"\b(check|view|show|get)\b.*\bstatus\b",
-        normalized
-    ):
-        return True
-
-    if re.search(
-        r"\bstatus\s+REQ\d+\b",
-        text,
-        flags=re.IGNORECASE
-    ):
-        return True
-
-    if re.search(
-        r"\bREQ\d+\s+status\b",
-        text,
-        flags=re.IGNORECASE
-    ):
-        return True
-
-    return False
-
-
-def is_buy_request(text):
-
-    normalized = normalize_text(text)
-
-    patterns = [
-        r"\bi\s+want\s+to\s+buy\b",
-        r"\bwant\s+to\s+buy\b",
-        r"\bi\s+need\s+to\s+buy\b",
-        r"\bneed\s+to\s+buy\b",
-        r"\bbuy\b",
-        r"\bpurchase\b"
-    ]
-
-    return any(
-        re.search(pattern, normalized)
-        for pattern in patterns
-    )
-
-
-def is_sell_request(text):
-
-    normalized = normalize_text(text)
-
-    patterns = [
-        r"\bi\s+want\s+to\s+sell\b",
-        r"\bwant\s+to\s+sell\b",
-        r"\bi\s+need\s+to\s+sell\b",
-        r"\bneed\s+to\s+sell\b",
-        r"\bsell\b"
-    ]
-
-    return any(
-        re.search(pattern, normalized)
-        for pattern in patterns
-    )
-
-
-# ============================================================
-# SPECIAL COMMAND
-# ============================================================
-
-def detect_special_command(text):
-
-    normalized = normalize_text(text)
-
-    if normalized in {
-        "reset",
-        "restart",
-        "start over",
-        "clear",
-        "new request"
-    }:
-        return "RESET"
-
+    # EXIT
     if normalized in {
         "exit",
         "quit",
         "bye",
-        "goodbye",
-        "close"
+        "stop",
     }:
         return "EXIT"
 
-    return None
+    # RESET
+    if normalized in {
+        "reset",
+        "start over",
+        "restart",
+    }:
+        return "RESET"
+
+    # UPDATE STATUS
+    update_patterns = [
+        r"\bupdate\s+(?:the\s+)?status\b",
+        r"\bchange\s+(?:the\s+)?status\b",
+        r"\bmark\s+req\d+\b.*\b(?:as|to)\b",
+        r"\breq\d+\s+to\s+\w+",
+    ]
+
+    for pattern in update_patterns:
+        if re.search(pattern, normalized):
+            return "UPDATE_STATUS"
+
+    # CHECK STATUS
+    if (
+        re.search(r"\bstatus\s+req\d+\b", normalized)
+        or re.search(r"\bcheck\s+(?:the\s+)?status\b", normalized)
+        or re.search(r"\btrack\s+req\d+\b", normalized)
+    ):
+        return "CHECK_STATUS"
+
+    # GET ALL REQUESTS
+    if (
+        "all requests" in normalized
+        or "show requests" in normalized
+        or "show all requests" in normalized
+        or "list requests" in normalized
+    ):
+        return "GET_ALL_REQUESTS"
+
+    # SELL
+    if re.search(
+        r"\b(?:sell|selling)\b",
+        normalized
+    ):
+        return "SELL_GRAIN"
+
+    # BUY
+    if re.search(
+        r"\b(?:buy|buying)\b",
+        normalized
+    ):
+        return "BUY_GRAIN"
+
+    return "UNKNOWN"
 
 
 # ============================================================
-# UPDATE STATUS PARSER
+# MAIN SMART PARSER
 # ============================================================
 
-def parse_update_status(text):
-
-    request_id = extract_request_id(
-        text
-    )
-
-    status = extract_status(
-        text
-    )
-
-    return {
-        "intent": "UPDATE_STATUS",
-        "details": {
-            "request_id": request_id,
-            "status": status
-        }
-    }
-
-
-# ============================================================
-# CHECK STATUS PARSER
-# ============================================================
-
-def parse_check_status(text):
-
-    request_id = extract_request_id(
-        text
-    )
-
-    return {
-        "intent": "CHECK_STATUS",
-        "details": {
-            "request_id": request_id
-        }
-    }
-
-
-# ============================================================
-# SELL / BUY PARSER
-# ============================================================
-
-def parse_sell_buy(text):
-
-    sell = is_sell_request(
-        text
-    )
-
-    buy = is_buy_request(
-        text
-    )
-
-    if sell and not buy:
-
-        intent = "SELL_GRAIN"
-
-    elif buy and not sell:
-
-        intent = "BUY_GRAIN"
-
-    else:
-
-        intent = None
-
-    quantity = extract_quantity(
-        text
-    )
-
-    location = extract_location(
-        text
-    )
-
-    product = extract_product(
-        text
-    )
-
-    person_name = extract_person_name(
-        text
-    )
-
-    details = {
-        "farmer_name": person_name,
-        "buyer_name": person_name,
-        "grain_type": product,
-        "quantity": quantity,
-        "location": location
-    }
-
-    return {
-        "intent": intent,
-        "details": details
-    }
-
-
-# ============================================================
-# MAIN PARSER
-# ============================================================
-
-def parse_message(text):
-
+def smart_parse(text):
     text = clean_text(text)
 
-    if not text:
+    intent = detect_intent(text)
 
-        return {
-            "intent": None,
-            "details": {}
-        }
+    details = {
+        "farmer_name": None,
+        "buyer_name": None,
+        "grain_type": None,
+        "quantity": None,
+        "location": None,
+    }
 
     # --------------------------------------------------------
-    # SPECIAL COMMAND
+    # SELL / BUY
     # --------------------------------------------------------
 
-    special = detect_special_command(
-        text
-    )
+    if intent in {
+        "SELL_GRAIN",
+        "BUY_GRAIN",
+    }:
+        person_name = extract_person_name(text)
+        product = extract_product(text)
+        quantity = extract_quantity(text)
+        location = extract_location(text)
 
-    if special:
+        details["grain_type"] = product
+        details["quantity"] = quantity
+        details["location"] = location
 
-        return {
-            "intent": special,
-            "details": {}
-        }
+        if intent == "SELL_GRAIN":
+            details["farmer_name"] = person_name
+            details["buyer_name"] = person_name
+
+        elif intent == "BUY_GRAIN":
+            details["farmer_name"] = person_name
+            details["buyer_name"] = person_name
 
     # --------------------------------------------------------
     # UPDATE STATUS
     # --------------------------------------------------------
 
-    if is_update_status_request(
-        text
-    ):
-
-        return parse_update_status(
-            text
-        )
-
-    # --------------------------------------------------------
-    # GET ALL REQUESTS
-    # --------------------------------------------------------
-
-    if is_get_all_requests(text):
-
+    elif intent == "UPDATE_STATUS":
         return {
-            "intent": "GET_ALL_REQUESTS",
-            "details": {}
+            "intent": "UPDATE_STATUS",
+            "details": {
+                "request_id": extract_request_id(text),
+                "status": extract_status(text),
+            },
         }
 
     # --------------------------------------------------------
     # CHECK STATUS
     # --------------------------------------------------------
 
-    if is_check_status_request(
-        text
-    ):
-
-        return parse_check_status(
-            text
-        )
+    elif intent == "CHECK_STATUS":
+        return {
+            "intent": "CHECK_STATUS",
+            "details": {
+                "request_id": extract_request_id(text),
+            },
+        }
 
     # --------------------------------------------------------
-    # SELL / BUY
+    # OTHER INTENTS
     # --------------------------------------------------------
 
-    return parse_sell_buy(
-        text
-    )
+    elif intent in {
+        "RESET",
+        "EXIT",
+        "GET_ALL_REQUESTS",
+    }:
+        return {
+            "intent": intent,
+            "details": {},
+        }
+
+    return {
+        "intent": intent,
+        "details": details,
+    }
 
 
 # ============================================================
 # COMPATIBILITY ALIASES
 # ============================================================
 
-def smart_parse(text):
-    """
-    Main public parser function.
-    """
+def smart_parse_message(text):
+    return smart_parse(text)
 
-    return parse_message(
-        text
-    )
+
+def smart_parse_request(text):
+    return smart_parse(text)
 
 
 def understand_message(text):
-    """
-    Compatibility alias.
-    """
-
-    return parse_message(
-        text
-    )
-
-
-def smart_parse_message(text):
-    """
-    Compatibility alias for older code.
-
-    This is intentionally defined here,
-    not imported from this same module.
-    """
-
-    return parse_message(
-        text
-    )
+    return smart_parse(text)
 
 
 # ============================================================
@@ -737,11 +507,18 @@ def smart_parse_message(text):
 
 if __name__ == "__main__":
 
-    tests = [
-
+    test_messages = [
         "I want to sell 50 kg of tomatoes",
 
+        "I want to sell 50 kgs of tomatoes from Bhimavaram my name is Mishra",
+
         "I want to buy 100 kg of red chillie",
+
+        "I want to buy 100 kg of tomatoes from Bhimavaram my name is Mishra",
+
+        "I want to sell 20 kilograms of apples from Bhimavaram my name is Poorna",
+
+        "I want to sell 30 kgs of green chillies from Srikakulam my name is Mithra",
 
         "Update status of REQ004 to UNDER_REVIEW",
 
@@ -757,22 +534,19 @@ if __name__ == "__main__":
 
         "reset",
 
-        "exit"
+        "exit",
     ]
 
-    print()
     print("=" * 70)
     print("SMART PARSER TEST")
     print("=" * 70)
 
-    for test in tests:
+    for message in test_messages:
 
-        result = parse_message(
-            test
-        )
+        result = smart_parse(message)
 
         print()
-        print("INPUT :", test)
+        print("INPUT :", message)
         print("OUTPUT:", result)
 
     print()
