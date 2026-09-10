@@ -1,87 +1,104 @@
-conversation_data = {}
+class ConversationManager:
 
+    def __init__(self):
+        self.intent = None
+        self.details = {}
 
-def start_conversation(intent, details=None):
-    global conversation_data
+    def start_conversation(self, intent, details):
 
-    if details is None:
-        details = {}
+        self.intent = intent
+        self.details = details.copy()
 
-    conversation_data = {
-        "intent": intent,
-        "details": details.copy()
-    }
+        return {
+            "intent": self.intent,
+            "details": self.details
+        }
 
-    return conversation_data
+    def add_information(self, new_details):
 
+        for key, value in new_details.items():
 
-def update_conversation(new_details):
-    global conversation_data
+            if value is not None and value != "":
+                self.details[key] = value
 
-    if not conversation_data:
+        return {
+            "intent": self.intent,
+            "details": self.details
+        }
+
+    def get_conversation(self):
+
+        if self.intent is None:
+            return {}
+
+        return {
+            "intent": self.intent,
+            "details": self.details
+        }
+
+    def get_intent(self):
+
+        return self.intent
+
+    def get_details(self):
+
+        return self.details.copy()
+
+    def clear_conversation(self):
+
+        self.intent = None
+        self.details = {}
+
         return {}
-
-    existing_details = conversation_data.get("details", {})
-
-    for key, value in new_details.items():
-        if value is not None:
-            existing_details[key] = value
-
-    conversation_data["details"] = existing_details
-
-    return conversation_data
-
-
-def get_conversation():
-    return conversation_data
-
-
-def clear_conversation():
-    global conversation_data
-
-    conversation_data = {}
-
-    return conversation_data
 
 
 if __name__ == "__main__":
+
+    conversation = ConversationManager()
+
     print("Starting conversation...")
 
-    start_conversation(
-        "SELL_GRAIN",
-        {
-            "grain_type": "Rice",
-            "quantity": None,
-            "location": None,
-            "farmer_name": None
-        }
+    print(
+        conversation.start_conversation(
+            "SELL_GRAIN",
+            {
+                "grain_type": "Rice",
+                "quantity": None,
+                "location": None,
+                "farmer_name": None
+            }
+        )
     )
 
-    print(get_conversation())
+    print()
 
-    print("\nAdding quantity and location...")
+    print("Adding quantity and location...")
 
-    update_conversation(
-        {
-            "quantity": 500,
-            "location": "Bhimavaram"
-        }
+    print(
+        conversation.add_information(
+            {
+                "quantity": 500,
+                "location": "Bhimavaram"
+            }
+        )
     )
 
-    print(get_conversation())
+    print()
 
-    print("\nAdding farmer name...")
+    print("Adding farmer name...")
 
-    update_conversation(
-        {
-            "farmer_name": "Ramesh"
-        }
+    print(
+        conversation.add_information(
+            {
+                "farmer_name": "Ramesh"
+            }
+        )
     )
 
-    print(get_conversation())
+    print()
 
-    print("\nClearing conversation...")
+    print("Clearing conversation...")
 
-    clear_conversation()
-
-    print(get_conversation())
+    print(
+        conversation.clear_conversation()
+    )

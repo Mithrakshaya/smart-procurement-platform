@@ -1,5 +1,10 @@
 def find_missing_information(intent, details):
 
+    if not details:
+        details = {}
+
+    required_fields = []
+
     if intent == "SELL_GRAIN":
         required_fields = [
             "farmer_name",
@@ -21,60 +26,59 @@ def find_missing_information(intent, details):
             "request_id"
         ]
 
-    else:
-        return []
-
-    missing_fields = []
+    missing_information = []
 
     for field in required_fields:
         if not details.get(field):
-            missing_fields.append(field)
+            missing_information.append(field)
 
-    return missing_fields
+    return missing_information
 
 
 if __name__ == "__main__":
 
-    seller_details = {
+    sell_details = {
         "farmer_name": "Ramesh",
         "grain_type": "Rice",
         "quantity": None,
         "location": None
     }
 
-    result = find_missing_information(
-        "SELL_GRAIN",
-        seller_details
-    )
-
-    print("SELL_GRAIN Missing Information:")
-    print(result)
-    print()
-
-    buyer_details = {
+    buy_details = {
         "buyer_name": None,
         "grain_type": "Wheat",
         "quantity": 300,
         "location": "Hyderabad"
     }
 
-    result = find_missing_information(
-        "BUY_GRAIN",
-        buyer_details
-    )
-
-    print("BUY_GRAIN Missing Information:")
-    print(result)
-    print()
-
     status_details = {
         "request_id": None
     }
 
-    result = find_missing_information(
-        "CHECK_STATUS",
-        status_details
+    print("SELL_GRAIN Missing Information:")
+    print(
+        find_missing_information(
+            "SELL_GRAIN",
+            sell_details
+        )
     )
 
+    print()
+
+    print("BUY_GRAIN Missing Information:")
+    print(
+        find_missing_information(
+            "BUY_GRAIN",
+            buy_details
+        )
+    )
+
+    print()
+
     print("CHECK_STATUS Missing Information:")
-    print(result)
+    print(
+        find_missing_information(
+            "CHECK_STATUS",
+            status_details
+        )
+    )

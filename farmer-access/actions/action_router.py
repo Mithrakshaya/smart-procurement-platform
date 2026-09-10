@@ -1,180 +1,410 @@
-import sys
 import os
+import sys
 
 
-# ==========================================
-# GET REQUIRED FOLDER PATHS
-# ==========================================
+# ============================================================
+# PATH SETUP
+# ============================================================
 
-base_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..")
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+FARMER_ACCESS_DIR = os.path.dirname(CURRENT_DIR)
+CORE_DIR = os.path.join(FARMER_ACCESS_DIR, "core")
+
+if CORE_DIR not in sys.path:
+    sys.path.insert(0, CORE_DIR)
+
+
+# ============================================================
+# REQUEST STORE
+# ============================================================
+
+from request_store import (
+    create_request,
+    get_request,
+    get_all_requests,
+    update_request_status,
+)
+from validation import (
+    validate_sell_details,
+    validate_buy_details,
+    validate_check_status_details,
+    validate_update_status_details,
 )
 
-grain_path = os.path.join(base_path, "grain")
-status_path = os.path.join(base_path, "status")
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def clean_value(value):
+    """
+    Convert a value into a clean string.
+    """
+
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    return value
 
 
-# ==========================================
-# ADD PATHS TO PYTHON PATH
-# ==========================================
+def clean_quantity(value):
+    """
+    Convert quantity into a number when possible.
+    """
 
-sys.path.append(grain_path)
-sys.path.append(status_path)
+    if value is None:
+        return None
 
+    try:
+        return float(value)
 
-# ==========================================
-# IMPORT REQUIRED MODULES
-# ==========================================
-
-from sell_grain import create_sell_request
-from buy_grain import create_buy_request
-from status_service import check_request_status
+    except (ValueError, TypeError):
+        return value
 
 
-# ==========================================
-# ROUTE FARMER ACTION
-# ==========================================
+# ============================================================
+# SELL GRAIN
+# ============================================================
 
-def route_action(intent, farmer_details=None):
+def handle_sell(details):
+    """
+    Create a persistent grain selling request.
+    """
 
-    # ------------------------------------------
-    # Handle SELL_GRAIN request
-    # ------------------------------------------
+    valid, error_message, cleaned = validate_sell_details(details or {})
+
+    if not valid:
+        return {
+            "success": False,
+            "message": error_message,
+        }
+
+    request_data = {
+        "request_type": "SELL_GRAIN",
+        "farmer_name": cleaned["farmer_name"],
+        "grain_type": cleaned["grain_type"],
+        "quantity": cleaned["quantity"],
+        "location": cleaned["location"],
+    }
+
+    request = create_request(request_data)
+
+    return {
+        "success": True,
+        "message": "Grain selling request created successfully",
+        "request": request
+    }
+
+
+# ============================================================
+# BUY GRAIN
+# ============================================================
+
+def handle_buy(details):
+    """
+    Create a persistent grain buying request.
+    """
+
+    valid, error_message, cleaned = validate_buy_details(details or {})
+
+    if not valid:
+        return {
+            "success": False,
+            "message": error_message,
+        }
+
+    request_data = {
+        "request_type": "BUY_GRAIN",
+        "buyer_name": cleaned["buyer_name"],
+        "grain_type": cleaned["grain_type"],
+        "quantity": cleaned["quantity"],
+        "location": cleaned["location"],
+    }
+
+    request = create_request(request_data)
+
+    return {
+        "success": True,
+        "message": "Grain buying request created successfully",
+        "request": request
+    }
+
+
+# ============================================================
+# CHECK STATUS
+# ============================================================
+
+def handle_check_status(details):
+    """
+    Check the status of a real stored request.
+    """
+
+    valid, error_message, cleaned = validate_check_status_details(details or {})
+
+    if not valid:
+        return {
+            "success": False,
+            "message": error_message,
+        }
+
+    request_id = cleaned["request_id"]
+
+    request = get_request(request_id)
+
+    if request is None:
+        return {
+            "success": False,
+            "message": (
+                f"I could not find request {request_id}. "
+                "Please check the request ID and try again."
+            )
+        }
+
+    status = request.get(
+        "status",
+        "REQUEST_CREATED"
+    )
+
+    return {
+        "success": True,
+        "message": (
+            f"Request {request['request_id']} "
+            f"is currently {status.replace('_', ' ').lower()}."
+        ),
+        "request": request
+    }
+
+
+# ============================================================
+# UPDATE STATUS
+# ============================================================
+
+def handle_update_status(details):
+    """
+    Update the status of an existing request.
+    """
+
+    request_id = clean_value(
+        details.get("request_id")
+    )
+
+    new_status = clean_value(
+        details.get("status")
+    )
+
+    if request_id is None:
+        return {
+            "success": False,
+            "message": "Please provide the request ID."
+        }
+
+    if new_status is None:
+        return {
+            "success": False,
+            "message": "Please provide the new status."
+        }
+
+    updated_request = update_request_status(
+        request_id,
+        new_status
+    )
+
+    if updated_request is None:
+        return {
+            "success": False,
+            "message": (
+                f"Request {request_id} was not found."
+            )
+        }
+
+    return {
+        "success": True,
+        "message": (
+            f"Request {request_id} status updated to "
+            f"{new_status.replace('_', ' ').lower()}."
+        ),
+        "request": updated_request
+    }
+
+
+# ============================================================
+# GET ALL REQUESTS
+# ============================================================
+
+def handle_get_all_requests():
+    """
+    Return all stored requests.
+    """
+
+    requests = get_all_requests()
+
+    return {
+        "success": True,
+        "message": f"{len(requests)} request(s) found.",
+        "requests": requests
+    }
+
+
+# ============================================================
+# MAIN ACTION ROUTER
+# ============================================================
+
+def route_action(intent, details):
+    """
+    Central action router.
+
+    Supported actions:
+
+        SELL_GRAIN
+        BUY_GRAIN
+        CHECK_STATUS
+        UPDATE_STATUS
+        GET_ALL_REQUESTS
+    """
+
+    if details is None:
+        details = {}
+
+    intent = str(intent).strip().upper()
+
+    # --------------------------------------------------------
+    # SELL
+    # --------------------------------------------------------
 
     if intent == "SELL_GRAIN":
 
-        if not farmer_details:
-            return {
-                "action": "SELL_GRAIN",
-                "response": "Please provide farmer details to create a selling request"
-            }
-
-        result = create_sell_request(
-            farmer_name=farmer_details.get("farmer_name"),
-            grain_type=farmer_details.get("grain_type"),
-            quantity=farmer_details.get("quantity", 0),
-            location=farmer_details.get("location")
-        )
-
         return {
             "action": "SELL_GRAIN",
-            "response": result
+            "response": handle_sell(details)
         }
 
-    # ------------------------------------------
-    # Handle BUY_GRAIN request
-    # ------------------------------------------
+    # --------------------------------------------------------
+    # BUY
+    # --------------------------------------------------------
 
     elif intent == "BUY_GRAIN":
 
-        if not farmer_details:
-            return {
-                "action": "BUY_GRAIN",
-                "response": "Please provide buyer details to create a buying request"
-            }
-
-        result = create_buy_request(
-            buyer_name=farmer_details.get("buyer_name"),
-            grain_type=farmer_details.get("grain_type"),
-            quantity=farmer_details.get("quantity", 0),
-            location=farmer_details.get("location")
-        )
-
         return {
             "action": "BUY_GRAIN",
-            "response": result
+            "response": handle_buy(details)
         }
 
-    # ------------------------------------------
-    # Handle CHECK_STATUS request
-    # ------------------------------------------
+    # --------------------------------------------------------
+    # CHECK STATUS
+    # --------------------------------------------------------
 
     elif intent == "CHECK_STATUS":
 
-        if not farmer_details or not farmer_details.get("request_id"):
-            return {
-                "action": "CHECK_STATUS",
-                "response": "Please provide a valid request ID"
-            }
-
-        request_id = farmer_details.get("request_id")
-
-        result = check_request_status(request_id)
-
         return {
             "action": "CHECK_STATUS",
-            "response": result
+            "response": handle_check_status(details)
         }
 
-    # ------------------------------------------
-    # Handle UNKNOWN request
-    # ------------------------------------------
+    # --------------------------------------------------------
+    # UPDATE STATUS
+    # --------------------------------------------------------
+
+    elif intent == "UPDATE_STATUS":
+
+        return {
+            "action": "UPDATE_STATUS",
+            "response": handle_update_status(details)
+        }
+
+    # --------------------------------------------------------
+    # GET ALL REQUESTS
+    # --------------------------------------------------------
+
+    elif intent == "GET_ALL_REQUESTS":
+
+        return {
+            "action": "GET_ALL_REQUESTS",
+            "response": handle_get_all_requests()
+        }
+
+    # --------------------------------------------------------
+    # UNKNOWN ACTION
+    # --------------------------------------------------------
 
     else:
+
         return {
             "action": "UNKNOWN",
-            "response": "Sorry, I could not understand your request"
+            "response": {
+                "success": False,
+                "message": (
+                    f"I don't know how to handle "
+                    f"the action '{intent}'."
+                )
+            }
         }
 
 
-# ==========================================
-# TEST ACTION ROUTER
-# ==========================================
+# ============================================================
+# TEST
+# ============================================================
 
 if __name__ == "__main__":
 
-    # ------------------------------------------
-    # Test SELL_GRAIN
-    # ------------------------------------------
+    print("\n========================================")
+    print("     GrainFlow Action Router Test")
+    print("========================================\n")
 
-    seller_details = {
-        "farmer_name": "Ramesh",
-        "grain_type": "Rice",
-        "quantity": 500,
-        "location": "Bhimavaram"
-    }
+    # --------------------------------------------------------
+    # SELL TEST
+    # --------------------------------------------------------
 
     sell_result = route_action(
         "SELL_GRAIN",
-        seller_details
+        {
+            "farmer_name": "Ramesh",
+            "grain_type": "tomatoes",
+            "quantity": 50,
+            "location": "Bhimavaram"
+        }
     )
 
-    print("SELL_GRAIN")
+    print("SELL RESULT:")
     print(sell_result)
-    print()
 
-    # ------------------------------------------
-    # Test BUY_GRAIN
-    # ------------------------------------------
-
-    buyer_details = {
-        "buyer_name": "Suresh",
-        "grain_type": "Wheat",
-        "quantity": 300,
-        "location": "Hyderabad"
-    }
+    # --------------------------------------------------------
+    # BUY TEST
+    # --------------------------------------------------------
 
     buy_result = route_action(
         "BUY_GRAIN",
-        buyer_details
+        {
+            "buyer_name": "Mithra",
+            "grain_type": "dragon fruit",
+            "quantity": 20,
+            "location": "Hyderabad"
+        }
     )
 
-    print("BUY_GRAIN")
+    print("\nBUY RESULT:")
     print(buy_result)
-    print()
 
-    # ------------------------------------------
-    # Test CHECK_STATUS
-    # ------------------------------------------
+    # --------------------------------------------------------
+    # STATUS TEST
+    # --------------------------------------------------------
 
-    status_details = {
-        "request_id": "REQ002"
-    }
+    request_id = sell_result["response"]["request"]["request_id"]
 
     status_result = route_action(
         "CHECK_STATUS",
-        status_details
+        {
+            "request_id": request_id
+        }
     )
 
-    print("CHECK_STATUS")
+    print("\nSTATUS RESULT:")
     print(status_result)
+
+    print("\n========================================")
+    print("      Action Router Test Complete")
+    print("========================================")

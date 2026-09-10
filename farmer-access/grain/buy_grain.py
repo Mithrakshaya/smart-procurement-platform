@@ -1,35 +1,51 @@
-def create_buy_request(buyer_name, grain_type, quantity, location):
+import sys
+import os
 
-    # Validate buyer name
-    if not buyer_name:
+base_path = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
+nlp_path = os.path.join(
+    base_path,
+    "nlp"
+)
+
+sys.path.append(nlp_path)
+
+from missing_info_detector import find_missing_information
+
+
+def create_buy_request(
+    buyer_name,
+    grain_type,
+    quantity,
+    location
+):
+
+    buyer_details = {
+        "buyer_name": buyer_name,
+        "grain_type": grain_type,
+        "quantity": quantity,
+        "location": location
+    }
+
+    missing_information = find_missing_information(
+        "BUY_GRAIN",
+        buyer_details
+    )
+
+    if missing_information:
+
         return {
             "success": False,
-            "message": "Buyer name is required"
+            "message": "Please provide: " +
+            ", ".join(missing_information)
         }
 
-    # Validate grain type
-    if not grain_type:
-        return {
-            "success": False,
-            "message": "Grain type is required"
-        }
-
-    # Validate quantity
-    if quantity <= 0:
-        return {
-            "success": False,
-            "message": "Quantity must be greater than zero"
-        }
-
-    # Validate location
-    if not location:
-        return {
-            "success": False,
-            "message": "Location is required"
-        }
-
-    # Create the grain buying request
-    buy_request = {
+    request = {
         "buyer_name": buyer_name,
         "grain_type": grain_type,
         "quantity": quantity,
@@ -40,7 +56,7 @@ def create_buy_request(buyer_name, grain_type, quantity, location):
     return {
         "success": True,
         "message": "Grain buying request created successfully",
-        "request": buy_request
+        "request": request
     }
 
 
@@ -50,7 +66,7 @@ if __name__ == "__main__":
         buyer_name="Suresh",
         grain_type="Wheat",
         quantity=300,
-        location="Bhimavaram"
+        location="Hyderabad"
     )
 
     print(result)
