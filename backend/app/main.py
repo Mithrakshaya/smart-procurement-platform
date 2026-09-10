@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from backend.app.modules.dashboard.routes import router as dashboard_router
 
 from backend.app.modules.farmer.router import router as farmer_router
 from backend.app.db.database import Base, engine
@@ -12,6 +14,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(dashboard_router)
 app.include_router(farmer_router)
 app.include_router(booking_router)
 
